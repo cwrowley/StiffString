@@ -11,23 +11,23 @@
 #include "SynthVoice.h"
 #include "SynthSound.h"
 
-SynthVoice::SynthVoice(LEAF *const leaf) : leaf(leaf)
-{
-    tCycle_init(&osc, leaf);
-}
+SynthVoice::SynthVoice(LEAF *const leaf, int numModes) :
+    leaf(leaf),
+    numModes(numModes),
+    stiffString(leaf, numModes)
+{}
 
 bool SynthVoice::canPlaySound (juce::SynthesiserSound* sound)
 {
     return dynamic_cast<SynthSound*>(sound) != nullptr;
 }
 
-void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound_in, int currentPitchWheelPosition)
+void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound, int currentPitchWheelPosition)
 {
     if (!playing) {
-        auto sound = static_cast<SynthSound *>(sound_in);
+        stiffString.setInitialAmplitudes();
         auto cyclesPerSecond = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
-        tCycle_setFreq(&osc, cyclesPerSecond);
-        DBG("newnote: " << cyclesPerSecond << "Hz");
+        stiffString.setFreq(cyclesPerSecond);
     }
     playing = true;
     masterAmplitude = 0.7f;
@@ -38,7 +38,6 @@ void SynthVoice::stopNote (float velocity, bool allowTailOff)
     if (playing) {
         masterAmplitude = 0.0f;
         playing = false;
-        DBG("stopped");
     }
 }
 
@@ -63,7 +62,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer< float > &outputBuffer, int 
     voiceBuffer.clear();
 
     for (int s = 0; s < numSamples; ++s) {
-        float val = masterAmplitude * tCycle_tick(&osc);
+        float val = masterAmplitude * stiffString.getNextSample();
         for (int ch = 0; ch < outputBuffer.getNumChannels(); ++ch) {
             voiceBuffer.addSample(ch, s, val);
         }

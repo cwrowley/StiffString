@@ -13,7 +13,7 @@
 //==============================================================================
 /**
 */
-class StiffStringAudioProcessor  : public juce::AudioProcessor
+class StiffStringAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorValueTreeState::Listener
 {
 public:
     //==============================================================================
@@ -56,10 +56,15 @@ public:
     const juce::AudioProcessorValueTreeState& getParams() { return params; }
     
 private:
-    const int numVoices = 1;
+    const int numVoices = 6;
+    const int numModes = 32;
     juce::Synthesiser synth;
+
     juce::AudioProcessorValueTreeState params;
     juce::AudioProcessorValueTreeState::ParameterLayout createParams();
+    void addListeners();
+    void removeListeners();
+    void parameterChanged(const juce::String &parameterID, float newValue) override;
 
     const static int leafMemSize = 32;
     char leafMemory[leafMemSize];
