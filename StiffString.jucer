@@ -3,7 +3,8 @@
 <JUCERPROJECT id="EuVw8M" name="StiffString" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" displaySplashScreen="1" jucerFormatVersion="1"
               companyName="CWR Audio" companyWebsite="cwrowley.princeton.edu"
-              companyEmail="cwrowley@princeton.edu" projectLineFeed="&#10;">
+              companyEmail="cwrowley@princeton.edu" projectLineFeed="&#10;"
+              pluginCharacteristicsValue="pluginIsSynth,pluginWantsMidiIn">
   <MAINGROUP id="cp5FDZ" name="StiffString">
     <GROUP id="{494ECDC2-3D44-A3A9-A7D8-9A7E802B53A0}" name="Source">
       <FILE id="raq6uH" name="PluginProcessor.cpp" compile="1" resource="0"
@@ -13,6 +14,10 @@
       <FILE id="HwV0fH" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="lVG0OQ" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="pNAuxs" name="SynthSound.cpp" compile="1" resource="0" file="Source/SynthSound.cpp"/>
+      <FILE id="gByKQU" name="SynthSound.h" compile="0" resource="0" file="Source/SynthSound.h"/>
+      <FILE id="difFkK" name="SynthVoice.cpp" compile="1" resource="0" file="Source/SynthVoice.cpp"/>
+      <FILE id="O9HHxn" name="SynthVoice.h" compile="0" resource="0" file="Source/SynthVoice.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
@@ -33,7 +38,8 @@
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="Builds/MacOSX" extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING">
+    <XCODE_MAC targetFolder="Builds/MacOSX" extraLinkerFlags="-Wl,-ld_classic"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="StiffString"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="StiffString"/>

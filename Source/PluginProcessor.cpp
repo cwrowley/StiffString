@@ -8,20 +8,28 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "SynthSound.h"
+#include "SynthVoice.h"
 
 //==============================================================================
-StiffStringAudioProcessor::StiffStringAudioProcessor()
-#ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties()
+StiffStringAudioProcessor::StiffStringAudioProcessor() :
+    AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
                       #if ! JucePlugin_IsSynth
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
-#endif
+                       ),
+    params(*this, nullptr, "Parameters", createParams())
 {
+    LEAF_init(&leaf, 44100, leafMemory, leafMemSize, []() { return (float) rand() / RAND_MAX; });
+
+    synth.addSound(new SynthSound());
+
+    for (int i=0; i < numVoices; ++i) {
+        synth.addVoice(new SynthVoice(&leaf));
+    }
 }
 
 StiffStringAudioProcessor::~StiffStringAudioProcessor()
@@ -29,72 +37,21 @@ StiffStringAudioProcessor::~StiffStringAudioProcessor()
 }
 
 //==============================================================================
-const juce::String StiffStringAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
-
-bool StiffStringAudioProcessor::acceptsMidi() const
-{
-   #if JucePlugin_WantsMidiInput
-    return true;
-   #else
-    return false;
-   #endif
-}
-
-bool StiffStringAudioProcessor::producesMidi() const
-{
-   #if JucePlugin_ProducesMidiOutput
-    return true;
-   #else
-    return false;
-   #endif
-}
-
-bool StiffStringAudioProcessor::isMidiEffect() const
-{
-   #if JucePlugin_IsMidiEffect
-    return true;
-   #else
-    return false;
-   #endif
-}
 
 double StiffStringAudioProcessor::getTailLengthSeconds() const
 {
     return 0.0;
 }
 
-int StiffStringAudioProcessor::getNumPrograms()
-{
-    return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
-                // so this should be at least 1, even if you're not really implementing programs.
-}
-
-int StiffStringAudioProcessor::getCurrentProgram()
-{
-    return 0;
-}
-
-void StiffStringAudioProcessor::setCurrentProgram (int index)
-{
-}
-
-const juce::String StiffStringAudioProcessor::getProgramName (int index)
-{
-    return {};
-}
-
-void StiffStringAudioProcessor::changeProgramName (int index, const juce::String& newName)
-{
-}
-
-//==============================================================================
 void StiffStringAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    LEAF_setSampleRate(&leaf, sampleRate);
+    synth.setCurrentPlaybackSampleRate(sampleRate);
+    for (int i = 0; i < synth.getNumVoices(); ++i) {
+        if (auto voice = static_cast<SynthVoice *>(synth.getVoice(i))) {
+            voice->prepareToPlay(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+        }
+    }
 }
 
 void StiffStringAudioProcessor::releaseResources()
@@ -132,30 +89,10 @@ bool StiffStringAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 void StiffStringAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    // auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
-    }
+    buffer.clear();
+    synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
 }
 
 //==============================================================================
@@ -166,7 +103,8 @@ bool StiffStringAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* StiffStringAudioProcessor::createEditor()
 {
-    return new StiffStringAudioProcessorEditor (*this);
+    //return new StiffStringAudioProcessorEditor (*this);
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
@@ -188,4 +126,15 @@ void StiffStringAudioProcessor::setStateInformation (const void* data, int sizeI
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new StiffStringAudioProcessor();
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout StiffStringAudioProcessor::createParams()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{ "PLUCKPOS", 1}, "Pluck pos", juce::NormalisableRange<float> { 0.01f, 0.99f, 0.01f }, 0.2f, ""));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{ "PICKUPPOS", 1}, "Pickup pos", juce::NormalisableRange<float> { 0.01f, 0.99f, 0.01f }, 0.1f, ""));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{ "STIFFNESS", 1}, "Stiffness", juce::NormalisableRange<float> { 0.0f, 3.0f, 0.001f }, 0.01f, ""));
+
+    return { params.begin(), params.end() };
 }
